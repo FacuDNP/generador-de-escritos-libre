@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Escrito - Dorado</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+body {
+  font-family: Arial;
+  background:#f9f6ef;
+  padding:20px;
+}
+
+input, select, textarea {
+  padding:10px;
+  margin:5px 0;
+  border:1px solid #c9a96e;
+  border-radius:6px;
+  width:100%;
+}
+
+textarea { height:220px; }
+
+button {
+  padding:12px;
+  background:#c9a96e;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.hidden { display:none; }
+
+.card {
+  border:1px solid #e0d3b8;
+  margin:10px 0;
+  padding:10px;
+  background:white;
+  border-radius:8px;
+  cursor:pointer;
+}
+</style>
+</head>
+
+<body>
+
+<h2>✍️ Escrito</h2>
+
+<!-- INTROITO -->
+<label>
+<input type="checkbox" id="checkIntro" onchange="toggleIntro()">
+ Agregar introito automático
+</label>
+
+<div id="bloqueIntro" class="hidden">
+
+<select id="abogado">
+  <option value="facu">Facu</option>
+  <option value="javier">Javier</option>
+  <option value="alejandro">Alejandro</option>
+</select>
+
+<input id="parte" placeholder="Nombre de la parte">
+
+<h4>🔎 Buscar expediente</h4>
+<input id="buscador" placeholder="Buscar...">
+<p id="estado"></p>
+<div id="resultados"></div>
+
+</div>
+
+<br>
+
+<!-- PLANTILLA -->
+<label>
+<input type="checkbox" id="checkPlantilla" onchange="togglePlantilla()">
+ Agregar plantilla de texto
+</label>
+
+<div id="bloquePlantilla" class="hidden">
+
+<select id="plantilla" onchange="cargarPlantilla()">
+  <option value="">Seleccionar plantilla</option>
+  <option value="prueba">Ofrecimiento de prueba</option>
+  <option value="documental">Desconocimiento de documental</option>
+</select>
+
+</div>
+
+<br>
+
+<input id="titulo" placeholder="Título">
+<textarea id="cuerpo" placeholder="Escriba aquí..."></textarea>
+
+<button onclick="generarPDF()">📄 Generar PDF</button>
+
+<script>
+
+// ================= TOGGLES =================
+
+function toggleIntro(){
+  let activo = document.getElementById("checkIntro").checked;
+  document.getElementById("bloqueIntro").classList.toggle("hidden", !activo);
+}
+
+function togglePlantilla(){
+  let activo = document.getElementById("checkPlantilla").checked;
+  document.getElementById("bloquePlantilla").classList.toggle("hidden", !activo);
+}
+
+// ================= PLANTILLAS =================
+
+function cargarPlantilla(){
+
+  let tipo = document.getElementById("plantilla").value;
+  let textarea = document.getElementById("cuerpo");
+
+  if(tipo === "prueba"){
+    textarea.value = `I.- PRUEBA TESTIMONIAL: Que por el presente vengo a ofrecer como testigos las siguientes personas: 1) 
+
+II.- PRUEBA INFORMATIVA: Que vengo a solicitar se libre Oficio al CORREO OFICIAL DE LA REP. ARGENTINA S.A a tal efecto de que remita copia autenticada como así Aviso o Certificado de Recepción de: 
+a) `;
+  }
+
+  if(tipo === "documental"){
+    textarea.value = `I.- Que en tiempo y forma vengo a desconocer la autenticidad de la siguiente documentación por contener datos falsos; no contener la firma de mi mandante; no tener fecha cierta; ser copias simples; no estar certificadas ante escribano publico; ser abstracta; y no corresponder a la realidad de los hechos: 
+a) 
+
+II.- Que atento el estado de autos, solicito se abra el periodo a prueba.`;
+  }
+}
+
+// ================= BUSCADOR =================
+
+const abogados = {
+  facu: { nombre:"FACUNDO JAVIER DORADO ALBORNOZ", matricula:"8136" },
+  javier: { nombre:"JAVIER ALEJANDRO DORADO", matricula:"2213" },
+  alejandro: { nombre:"ALEJANDRO ESEQUIEL DORADO ALBORNOZ", matricula:"6389" }
+};
+
+let datos = [];
+let casoSeleccionado = null;
+
+function limpiar(t){ return (t || "").toLowerCase(); }
+
+async function cargarHoja(nombre){
+  let url = `https://docs.google.com/spreadsheets/d/1rw1RyEKMKzIBasNQe_l6gQAajsRM_-9mFw5QEDBCvN4/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(nombre)}`;
+  let res = await fetch(url);
+  let text = await res.text();
+  let json = JSON.parse(text.substring(47).slice(0, -2));
+  let rows = json.table.rows || [];
+
+  return rows.map(r => {
+    let c = r.c.map(x => x ? x.v : "");
+    return {
+      texto: limpiar(c.join(" ")),
+      caratula: c[0] || "",
+      expediente: c[1] || ""
+    };
+  });
+}
+
+async function iniciar(){
+  let a = await cargarHoja("Dr. Facundo");
+  let b = await cargarHoja("Dr. Esequiel");
+  let c = await cargarHoja("Dr. Javier");
+  datos = [...a,...b,...c];
+}
+iniciar();
+
+document.getElementById("buscador").addEventListener("input", function(){
+  let v = limpiar(this.value);
+  let filtrados = datos.filter(d => d.texto.includes(v));
+
+  let html = "";
+  filtrados.forEach(item => {
+    html += `
+      <div class="card" onclick="seleccionarCaso('${item.caratula}','${item.expediente}')">
+        <b>${item.caratula}</b><br>
+        ${item.expediente}
+      </div>
+    `;
+  });
+
+  document.getElementById("resultados").innerHTML = html;
+});
+
+function seleccionarCaso(caratula, expediente){
+  casoSeleccionado = {caratula, expediente};
+  document.getElementById("estado").innerText = "Seleccionado: " + caratula;
+}
+
+// ================= PDF =================
+
+function generarPDF(){
+
+  const { jsPDF } = window.jspdf;
+  let doc = new jsPDF({ unit:"cm", format:"a4" });
+
+  let titulo = document.getElementById("titulo").value.toUpperCase();
+  let cuerpo = document.getElementById("cuerpo").value;
+  let usarIntro = document.getElementById("checkIntro").checked;
+
+  let x = 4;
+  let y = 4;
+  let sangria = 1.25;
+  let maxWidth = 15;
+
+  let pageHeight = doc.internal.pageSize.getHeight();
+  let margenInferior = 2;
+
+  function checkPageBreak(){
+    if(y > pageHeight - margenInferior){
+      doc.addPage();
+      y = 4;
+    }
+  }
+
+  doc.setFont("courier");
+  doc.setFontSize(13);
+
+  // TÍTULO
+  if(titulo){
+    doc.setFont("courier","bold");
+    doc.text(titulo, x, y);
+
+    let w = doc.getTextWidth(titulo);
+    doc.setLineWidth(0.02);
+    doc.line(x, y+0.08, x+w, y+0.08);
+
+    y += 1;
+    checkPageBreak();
+  }
+
+  function escribirJustificado(linea, startX, ancho, isLast){
+
+    let palabras = linea.split(" ");
+
+    if(isLast){
+      doc.text(linea, startX, y);
+      y += 0.6;
+      checkPageBreak();
+      return;
+    }
+
+    let anchoTexto = doc.getTextWidth(linea);
+    let espacios = palabras.length - 1;
+
+    if(espacios <= 0){
+      doc.text(linea, startX, y);
+      y += 0.6;
+      checkPageBreak();
+      return;
+    }
+
+    let extra = (ancho - anchoTexto) / espacios;
+    let currentX = startX;
+
+    palabras.forEach((p, i) => {
+      let palabraConEspacio = (i < palabras.length - 1) ? p + " " : p;
+
+      doc.text(palabraConEspacio, currentX, y);
+      currentX += doc.getTextWidth(palabraConEspacio);
+
+      if(i < espacios){
+        currentX += extra;
+      }
+    });
+
+    y += 0.6;
+    checkPageBreak();
+  }
+
+  // INTROITO
+  if(usarIntro){
+
+    let ab = abogados[document.getElementById("abogado").value];
+    let parte = document.getElementById("parte").value || "...";
+    let expte = (casoSeleccionado?.expediente || "...").split(" - ")[0];
+
+    doc.text("SR. JUEZ:", x, y);
+    y += 1;
+
+    let intro = `${ab.nombre}, Abogado, M.P. N°${ab.matricula}, apoderado de ${parte}, manteniendo domicilio procesal en Av. Belgrano N° 474, Piso 2 de esta ciudad y domicilio electrónico ${ab.matricula}, en autos caratulados: "${casoSeleccionado?.caratula || "..."}" (Expte. Nº ${expte}), a V.S. digo:`;
+
+    let lineasIntro = doc.splitTextToSize(intro, maxWidth - sangria);
+
+    lineasIntro.forEach((linea, i) => {
+      let startX = (i === 0) ? x + sangria : x;
+      let ancho = (i === 0) ? maxWidth - sangria : maxWidth;
+
+      escribirJustificado(linea, startX, ancho, i === lineasIntro.length - 1);
+    });
+
+    y += 0.5;
+  }
+
+  // CUERPO
+  let parrafos = cuerpo.split("\n");
+
+  parrafos.forEach(p => {
+
+    let lineas = doc.splitTextToSize(p, maxWidth - sangria);
+
+    lineas.forEach((linea, i) => {
+      let startX = (i === 0) ? x + sangria : x;
+      let ancho = (i === 0) ? maxWidth - sangria : maxWidth;
+
+      escribirJustificado(linea, startX, ancho, i === lineas.length - 1);
+    });
+
+    y += 0.3;
+    checkPageBreak();
+  });
+
+  // FIRMA SOLO SI HAY INTROITO
+  if(usarIntro){
+
+    y += 0.7;
+    checkPageBreak();
+
+    doc.setFont("courier","bold");
+    doc.text("SERÁ JUSTICIA", x + sangria, y);
+
+    y += 2;
+    checkPageBreak();
+
+    let ab = abogados[document.getElementById("abogado").value];
+
+    doc.setFont("courier","normal");
+    doc.setFontSize(8);
+
+    doc.text(`Dr. ${ab.nombre}`, 10.5, y, {align:"center"});
+    y += 0.4;
+    doc.text(`M.P. N°${ab.matricula}`, 10.5, y, {align:"center"});
+  }
+
+  doc.save("escrito.pdf");
+}
+
+</script>
+
+</body>
+</html>
