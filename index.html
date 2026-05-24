@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+<title>Editor Jurídico - Dorado</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body {
+  font-family: Arial;
+  background:#f9f6ef;
+  padding:20px;
+}
+input, select, textarea {
+  padding:10px;
+  margin:5px 0;
+  border:1px solid #c9a96e;
+  border-radius:6px;
+  width:100%;
+  box-sizing: border-box;
+}
+textarea { height:150px; }
+button {
+  padding:12px;
+  background:#c9a96e;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+button:hover {
+  background:#b8935a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+.card {
+  border:1px solid #e0d3b8;
+  margin:10px 0;
+  padding:10px;
+  background:white;
+  border-radius:8px;
+  cursor:pointer;
+  transition: all 0.3s ease;
+}
+.card:hover {
+  background:#f5f0e8;
+  border-color:#c9a96e;
+  transform: translateX(5px);
+}
+.card.seleccionado {
+  background:#c9a96e;
+  border-color:#8b7355;
+  color:white;
+  border-width: 2px;
+  box-shadow: 0 0 15px rgba(201, 169, 110, 0.5);
+}
+.caso-seleccionado {
+  display: none;
+  background: linear-gradient(135deg, #c9a96e 0%, #b8935a 100%);
+  border-radius: 8px;
+  padding: 15px;
+  margin: 15px 0;
+  color: white;
+  border-left: 5px solid #8b7355;
+  animation: slideIn 0.4s ease;
+}
+.caso-seleccionado.activo { display: block; }
+.caso-seleccionado h4 {
+  margin: 0 0 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.caso-seleccionado .checkmark {
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c9a96e;
+  font-weight: bold;
+  font-size: 14px;
+}
+.caso-seleccionado button {
+  background: white;
+  color: #c9a96e;
+  margin-top: 10px;
+  padding: 8px 15px;
+  font-size: 12px;
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.expediente-badge {
+  display: inline-block;
+  background: #e0d3b8;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-top: 5px;
+}
+.seccion { margin-bottom: 20px; }
+.seccion h3 {
+  color: #8b7355;
+  border-bottom: 2px solid #c9a96e;
+  padding-bottom: 10px;
+}
+#mensaje {
+  font-size: 14px;
+  margin: 10px 0;
+  padding: 10px;
+  border-radius: 6px;
+}
+#mensaje.success {
+  background: #e8f5e9;
+  border: 1px solid #66bb6a;
+  color: #2e7d32;
+}
+#mensaje.error {
+  background: #ffebee;
+  border: 1px solid #ef5350;
+  color: #c62828;
+}
+#estado {
+  font-size: 12px;
+  color: #8b7355;
+  margin: 5px 0;
+}
+button.guardar {
+  background: #66bb6a;
+}
+button.guardar:hover {
+  background: #558b2f;
+}
+
+label {
+  display: block;
+  margin: 10px 0;
+  cursor: pointer;
+  font-weight: bold;
+  color: #8b7355;
+}
+
+.hidden { display:none; }
+</style>
+</head>
+<body>
+<h2>⚖️ Editor Jurídico</h2>
+<div id="mensaje"></div>
+
+<label>
+<input type="checkbox" id="checkIntro" onchange="toggleIntro()">
+ Agregar introito automático
+</label>
+
+<div id="bloqueIntro" class="hidden">
+<div class="seccion">
+  <select id="abogado">
+    <option value="">Cargando...</option>
+  </select>
+  <input id="parte" placeholder="Nombre de la parte">
+</div>
+<div class="seccion">
+  <h3>🔎 Buscar expediente</h3>
+  <input id="buscador" placeholder="Buscar...">
+  <p id="estado"></p>
+  <div id="resultados"></div>
+</div>
+<div class="caso-seleccionado" id="indicadorCaso">
+  <h4><span class="checkmark">✓</span> <span id="casoTitulo"></span></h4>
+  <div class="detalles"><span class="expediente-badge" id="casoExpediente"></span></div>
+  <button onclick="limpiarCaso()">✕ Deseleccionar</button>
+</div>
+</div>
+
+<br>
+
+<label>
+<input type="checkbox" id="checkPlantilla" onchange="togglePlantilla()">
+ Agregar plantilla de texto
+</label>
+
+<div id="bloquePlantilla" class="hidden">
+<select id="plantilla" onchange="cargarPlantilla()">
+  <option value="">Seleccionar plantilla</option>
+  <option value="prueba">Ofrecimiento de prueba</option>
+  <option value="documental">Desconocimiento de documental</option>
+</select>
+</div>
+
+<br>
+
+<div class="seccion">
+  <h3>✍️ Escrito</h3>
+  <input id="titulo" placeholder="Título">
+  <textarea id="cuerpo"></textarea>
+  <button onclick="generarPDF()">📄 Generar PDF</button>
+  <button class="guardar" onclick="guardarEscrito()">💾 Guardar</button>
+</div>
+
+<script>
+
+function toggleIntro(){
+  document.getElementById('bloqueIntro').classList.toggle('hidden', !document.getElementById('checkIntro').checked);
+}
+
+function togglePlantilla(){
+  document.getElementById('bloquePlantilla').classList.toggle('hidden', !document.getElementById('checkPlantilla').checked);
+}
+
+function cargarPlantilla(){
+  let tipo = document.getElementById('plantilla').value;
+  let textarea = document.getElementById('cuerpo');
+  if(tipo === 'prueba'){
+    textarea.value = `I.- PRUEBA TESTIMONIAL: Que por el presente vengo a ofrecer como testigos las siguientes personas: 1) 
+
+II.- PRUEBA INFORMATIVA: Que vengo a solicitar se libre Oficio al CORREO OFICIAL DE LA REP. ARGENTINA S.A a tal efecto de que remita copia autenticada como así Aviso o Certificado de Recepción de: 
+a) `;
+  }
+  if(tipo === 'documental'){
+    textarea.value = `I.- Que en tiempo y forma vengo a desconocer la autenticidad de la siguiente documentación por contener datos falsos; no contener la firma de mi mandante; no tener fecha cierta; ser copias simples; no estar certificadas ante escribano publico; ser abstracta; y no corresponder a la realidad de los hechos: 
+a) 
+
+II.- Que atento el estado de autos, solicito se abra el periodo a prueba.`;
+  }
+}
+
+(async () => {
+  const SUPABASE_URL = 'https://lzmawlqnifakmzwudkti.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_2YWuP5GbRSdLpqR3AlaK3Q_ORD13xp1';
+  
+  // Esperar a que Supabase esté disponible
+  let supabase = null;
+  for(let i = 0; i < 50; i++) {
+    if(window.supabase && window.supabase.createClient) {
+      const { createClient } = window.supabase;
+      supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+      console.log('✓ Supabase conectado');
+      break;
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
+  
+  if(!supabase) {
+    console.error('✗ Supabase no se conectó');
+    return;
+  }
+
+  let abogados = {};
+  let datos = [];
+  let casoSeleccionado = null;
+
+  function mostrarMensaje(texto, tipo = 'info') {
+    let div = document.getElementById('mensaje');
+    div.className = tipo;
+    div.innerText = texto;
+    if(tipo !== 'error') setTimeout(() => div.innerText = '', 3000);
+  }
+
+  function limpiar(t){ return (t || "").toLowerCase(); }
+
+  function escapeHtml(text) {
+    let map = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'};
+    return text.replace(/[&<>"']/g, m => map[m]);
+  }
+
+  async function cargarAbogados() {
+    const { data, error } = await supabase.from('abogados').select('*').eq('activo', 1);
+    if(error) { console.error(error); return; }
+    
+    let select = document.getElementById('abogado');
+    select.innerHTML = '';
+    data.forEach(a => {
+      abogados[a.id] = {id: a.id, nombre: a.nombre, matricula: a.mp, domicilio_procesal: a.domicilio_procesal};
+      let opt = document.createElement('option');
+      opt.value = a.id;
+      opt.text = a.nombre;
+      select.appendChild(opt);
+    });
+    console.log('✓ Abogados cargados');
+  }
+
+  async function cargarExpedientes() {
+    document.getElementById('estado').innerText = '⏳ Cargando...';
+    const { data, error } = await supabase.from('expedientes').select('*');
+    if(error) { console.error(error); return; }
+    
+    datos = data.map(item => ({
+      id: item.id,
+      texto: limpiar((item.caratula || '') + ' ' + (item.num_1inst || '')),
+      caratula: item.caratula || '',
+      num_1inst: item.num_1inst || ''
+    }));
+    document.getElementById('estado').innerText = `✔ ${datos.length} expedientes`;
+    mostrarMensaje('✔ Datos cargados', 'success');
+  }
+
+  await cargarAbogados();
+  await cargarExpedientes();
+
+  document.getElementById('buscador').addEventListener('input', function(){
+    let v = limpiar(this.value);
+    let filtrados = datos.filter(d => d.texto.includes(v));
+    let html = "";
+    filtrados.forEach(item => {
+      let sel = casoSeleccionado && casoSeleccionado.id == item.id ? "seleccionado" : "";
+      html += `<div class="card ${sel}" data-id="${item.id}" data-caratula="${escapeHtml(item.caratula)}" data-num="${item.num_1inst}">
+        <b>${item.caratula}</b><br>
+        <span class="expediente-badge">${item.num_1inst}</span>
+      </div>`;
+    });
+    let div = document.getElementById('resultados');
+    div.innerHTML = html;
+    div.querySelectorAll('.card').forEach(card => {
+      card.addEventListener('click', function() {
+        let id = this.getAttribute('data-id');
+        let caratula = this.getAttribute('data-caratula');
+        let num = this.getAttribute('data-num');
+        casoSeleccionado = {id, caratula, num};
+        document.getElementById('casoTitulo').innerText = caratula;
+        document.getElementById('casoExpediente').innerText = "Expte. " + num;
+        document.getElementById('indicadorCaso').classList.add('activo');
+        document.getElementById('resultados').innerHTML = '';
+        document.getElementById('buscador').value = '';
+      });
+    });
+  });
+
+  window.limpiarCaso = () => {
+    casoSeleccionado = null;
+    document.getElementById('indicadorCaso').classList.remove('activo');
+    document.getElementById('resultados').innerHTML = '';
+    document.getElementById('buscador').value = '';
+  };
+
+  window.guardarEscrito = async () => {
+    if(!casoSeleccionado) { mostrarMensaje('Selecciona expediente', 'error'); return; }
+    let titulo = document.getElementById('titulo').value;
+    let cuerpo = document.getElementById('cuerpo').value;
+    let abogadoId = document.getElementById('abogado').value;
+    let parte = document.getElementById('parte').value;
+    if(!titulo || !cuerpo) { mostrarMensaje('Completa todos los campos', 'error'); return; }
+    
+    const { error } = await supabase.from('escritos').insert([{
+      expediente_id: casoSeleccionado.id,
+      abogado_id: abogadoId,
+      caratula: casoSeleccionado.caratula,
+      titulo, cuerpo, parte,
+      domicilio_procesal: abogados[abogadoId].domicilio_procesal,
+      fecha_creacion: new Date().toISOString()
+    }]);
+    
+    if(error) { mostrarMensaje('Error: ' + error.message, 'error'); return; }
+    mostrarMensaje('✔ Guardado', 'success');
+    document.getElementById('titulo').value = '';
+    document.getElementById('cuerpo').value = '';
+  };
+
+  window.generarPDF = () => {
+    if(!casoSeleccionado) { mostrarMensaje('Selecciona expediente', 'error'); return; }
+    const { jsPDF } = window.jspdf;
+    let doc = new jsPDF({ unit:"cm", format:"a4" });
+    let ab = abogados[document.getElementById("abogado").value];
+    let parte = document.getElementById("parte").value || "...";
+    let titulo = document.getElementById("titulo").value.toUpperCase();
+    let cuerpo = document.getElementById("cuerpo").value;
+    let x = 4, y = 4, sangria = 1.25, maxWidth = 15;
+    let pageHeight = doc.internal.pageSize.getHeight();
+    
+    function checkPageBreak(){ if(y > pageHeight - 2){ doc.addPage(); y = 4; } }
+    function escribirJustificado(linea, startX, ancho, isLast){
+      let palabras = linea.split(" ");
+      if(isLast || palabras.length <= 1) { doc.text(linea, startX, y); y += 0.6; checkPageBreak(); return; }
+      let anchoTexto = doc.getTextWidth(linea);
+      let espacios = palabras.length - 1;
+      let extra = (ancho - anchoTexto) / espacios;
+      let currentX = startX;
+      palabras.forEach((p, i) => {
+        doc.text(p, currentX, y);
+        currentX += doc.getTextWidth(p) + (i < espacios ? doc.getTextWidth(" ") + extra : 0);
+      });
+      y += 0.6; checkPageBreak();
+    }
+    
+    doc.setFont("courier");
+    if(titulo) {
+      doc.setFontSize(13);
+      doc.setFont("courier","bold");
+      doc.text(titulo, x, y);
+      let w = doc.getTextWidth(titulo);
+      doc.setLineWidth(0.02);
+      doc.line(x, y+0.08, x+w, y+0.08);
+      y += 1;
+      checkPageBreak();
+    }
+    
+    doc.setFont("courier","bold");
+    doc.setFontSize(13);
+    doc.text("SR. JUEZ:", x, y);
+    doc.setFont("courier","normal");
+    y += 1;
+    checkPageBreak();
+    
+    let sangriaDoble = sangria * 2;
+    
+    let intro = `${ab.nombre}, Abogado, M.P. N°${ab.matricula}, apoderado de ${parte}, domicilio procesal en ${ab.domicilio_procesal}, en autos: "${casoSeleccionado.caratula}" (Expte. Nº ${casoSeleccionado.num}), a V.S. digo:`;
+    let lineasIntro = doc.splitTextToSize(intro, maxWidth - sangriaDoble);
+    lineasIntro.forEach((linea, i) => {
+      let startX = i === 0 ? x + sangriaDoble : x;
+      let ancho = i === 0 ? maxWidth - sangriaDoble : maxWidth;
+      escribirJustificado(linea, startX, ancho, i === lineasIntro.length - 1);
+    });
+    
+    y += 0.5;
+    checkPageBreak();
+    
+    cuerpo.split("\n").forEach(p => {
+      let lineas = doc.splitTextToSize(p, maxWidth - sangriaDoble);
+      lineas.forEach((linea, i) => {
+        let startX = i === 0 ? x + sangriaDoble : x;
+        let ancho = i === 0 ? maxWidth - sangriaDoble : maxWidth;
+        escribirJustificado(linea, startX, ancho, i === lineas.length - 1);
+      });
+      y += 0.3;
+      checkPageBreak();
+    });
+    
+    checkPageBreak();
+    doc.setFont("courier","bold");
+    doc.text("SERÁ JUSTICIA", x + sangriaDoble, y);
+    y += 2;
+    checkPageBreak();
+    doc.setFont("courier","bold");
+    doc.setFontSize(8);
+    doc.text(`Dr. ${ab.nombre}`, 10.5, y, {align:"center"});
+    doc.setFont("courier","normal");
+    y += 0.4;
+    doc.text(`M.P. N°${ab.matricula}`, 10.5, y, {align:"center"});
+    
+    doc.save("escrito.pdf");
+  };
+})();
+</script>
+</body>
+</html>
