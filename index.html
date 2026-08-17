@@ -126,7 +126,7 @@ button:hover {
   border: 1px solid #ef5350;
   color: #c62828;
 }
-#estado {
+#estadoExpedientes {
   font-size: 12px;
   color: #8b7355;
   margin: 5px 0;
@@ -168,7 +168,7 @@ label {
 <div class="seccion">
   <h3>🔎 Buscar expediente</h3>
   <input id="buscador" placeholder="Buscar...">
-  <p id="estado"></p>
+  <p id="estadoExpedientes"></p>
   <div id="resultados"></div>
 </div>
 <div class="caso-seleccionado" id="indicadorCaso">
@@ -217,14 +217,14 @@ function cargarPlantilla(){
   let tipo = document.getElementById('plantilla').value;
   let textarea = document.getElementById('cuerpo');
   if(tipo === 'prueba'){
-    textarea.value = `I.- PRUEBA TESTIMONIAL: Que por el presente vengo a ofrecer como testigos las siguientes personas: 1) 
+    textarea.value = `I.- PRUEBA TESTIMONIAL: Que por el presente vengo a ofrecer como testigos las siguientes personas: 1)
 
-II.- PRUEBA INFORMATIVA: Que vengo a solicitar se libre Oficio al CORREO OFICIAL DE LA REP. ARGENTINA S.A a tal efecto de que remita copia autenticada como así Aviso o Certificado de Recepción de: 
+II.- PRUEBA INFORMATIVA: Que vengo a solicitar se libre Oficio al CORREO OFICIAL DE LA REP. ARGENTINA S.A a tal efecto de que remita copia autenticada como así Aviso o Certificado de Recepción de:
 a) `;
   }
   if(tipo === 'documental'){
-    textarea.value = `I.- Que en tiempo y forma vengo a desconocer la autenticidad de la siguiente documentación por contener datos falsos; no contener la firma de mi mandante; no tener fecha cierta; ser copias simples; no estar certificadas ante escribano publico; ser abstracta; y no corresponder a la realidad de los hechos: 
-a) 
+    textarea.value = `I.- Que en tiempo y forma vengo a desconocer la autenticidad de la siguiente documentación por contener datos falsos; no contener la firma de mi mandante; no tener fecha cierta; ser copias simples; no estar certificadas ante escribano publico; ser abstracta; y no corresponder a la realidad de los hechos:
+a)
 
 II.- Que atento el estado de autos, solicito se abra el periodo a prueba.`;
   }
@@ -233,7 +233,7 @@ II.- Que atento el estado de autos, solicito se abra el periodo a prueba.`;
 (async () => {
   const SUPABASE_URL = 'https://lzmawlqnifakmzwudkti.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_2YWuP5GbRSdLpqR3AlaK3Q_ORD13xp1';
-  
+
   // Esperar a que Supabase esté disponible
   let supabase = null;
   for(let i = 0; i < 50; i++) {
@@ -245,7 +245,7 @@ II.- Que atento el estado de autos, solicito se abra el periodo a prueba.`;
     }
     await new Promise(r => setTimeout(r, 100));
   }
-  
+
   if(!supabase) {
     console.error('✗ Supabase no se conectó');
     return;
@@ -272,7 +272,7 @@ II.- Que atento el estado de autos, solicito se abra el periodo a prueba.`;
   async function cargarAbogados() {
     const { data, error } = await supabase.from('abogados').select('*').eq('activo', 1);
     if(error) { console.error(error); return; }
-    
+
     let select = document.getElementById('abogado');
     select.innerHTML = '';
     data.forEach(a => {
@@ -286,17 +286,17 @@ II.- Que atento el estado de autos, solicito se abra el periodo a prueba.`;
   }
 
   async function cargarExpedientes() {
-    document.getElementById('estado').innerText = '⏳ Cargando...';
+    document.getElementById('estadoExpedientes').innerText = '⏳ Cargando...';
     const { data, error } = await supabase.from('expedientes').select('*');
     if(error) { console.error(error); return; }
-    
+
     datos = data.map(item => ({
       id: item.id,
       texto: limpiar((item.caratula || '') + ' ' + (item.num_1inst || '')),
       caratula: item.caratula || '',
       num_1inst: item.num_1inst || ''
     }));
-    document.getElementById('estado').innerText = `✔ ${datos.length} expedientes`;
+    document.getElementById('estadoExpedientes').innerText = `✔ ${datos.length} expedientes`;
     mostrarMensaje('✔ Datos cargados', 'success');
   }
 
@@ -345,7 +345,7 @@ II.- Que atento el estado de autos, solicito se abra el periodo a prueba.`;
     let abogadoId = document.getElementById('abogado').value;
     let parte = document.getElementById('parte').value;
     if(!titulo || !cuerpo) { mostrarMensaje('Completa todos los campos', 'error'); return; }
-    
+
     const { error } = await supabase.from('escritos').insert([{
       expediente_id: casoSeleccionado.id,
       abogado_id: abogadoId,
@@ -354,11 +354,9 @@ II.- Que atento el estado de autos, solicito se abra el periodo a prueba.`;
       domicilio_procesal: abogados[abogadoId].domicilio_procesal,
       fecha_creacion: new Date().toISOString()
     }]);
-    
+
     if(error) { mostrarMensaje('Error: ' + error.message, 'error'); return; }
     mostrarMensaje('✔ Guardado', 'success');
-    document.getElementById('titulo').value = '';
-    document.getElementById('cuerpo').value = '';
   };
 
   window.generarPDF = () => {
@@ -371,8 +369,9 @@ II.- Que atento el estado de autos, solicito se abra el periodo a prueba.`;
     let cuerpo = document.getElementById("cuerpo").value;
     let x = 4, y = 4, sangria = 1.25, maxWidth = 15;
     let pageHeight = doc.internal.pageSize.getHeight();
-    
+
     function checkPageBreak(){ if(y > pageHeight - 2){ doc.addPage(); y = 4; } }
+
     function escribirJustificado(linea, startX, ancho, isLast){
       let palabras = linea.split(" ");
       if(isLast || palabras.length <= 1) { doc.text(linea, startX, y); y += 0.6; checkPageBreak(); return; }
@@ -386,8 +385,70 @@ II.- Que atento el estado de autos, solicito se abra el periodo a prueba.`;
       });
       y += 0.6; checkPageBreak();
     }
-    
-    doc.setFont("courier");
+
+    // "palabra" = arreglo de piezas {texto,bold} que van pegadas sin espacio
+    // (una palabra normal tiene una sola pieza; "Perez," en el borde de una
+    // negrita tiene dos: "Perez" en negrita + "," normal, pegados)
+    function anchoPalabra(palabra){
+      let w = 0;
+      palabra.forEach(pz => {
+        doc.setFont("courier", pz.bold ? "bold" : "normal");
+        w += doc.getTextWidth(pz.texto);
+      });
+      return w;
+    }
+
+    function dibujarPalabra(palabra, cx){
+      palabra.forEach(pz => {
+        doc.setFont("courier", pz.bold ? "bold" : "normal");
+        doc.text(pz.texto, cx, y);
+        cx += doc.getTextWidth(pz.texto);
+      });
+      return cx;
+    }
+
+    function escribirJustificadoMixto(palabras, startX, ancho, isLast){
+      if(isLast || palabras.length <= 1) {
+        let cx = startX;
+        palabras.forEach(palabra => {
+          cx = dibujarPalabra(palabra, cx);
+          cx += doc.getTextWidth(" ");
+        });
+        y += 0.6; checkPageBreak();
+        return;
+      }
+      let anchoTexto = palabras.reduce((acc, p) => acc + anchoPalabra(p), 0);
+      let espacios = palabras.length - 1;
+      let extra = (ancho - anchoTexto) / espacios;
+      let currentX = startX;
+      palabras.forEach((palabra, i) => {
+        currentX = dibujarPalabra(palabra, currentX);
+        if(i < espacios) currentX += doc.getTextWidth(" ") + extra;
+      });
+      y += 0.6; checkPageBreak();
+    }
+
+    function armarLineasMixtas(palabras, anchoLinea){
+      let lineas = [];
+      let actual = [];
+      let anchoActual = 0;
+      palabras.forEach(palabra => {
+        let w = anchoPalabra(palabra);
+        let candidato = actual.length === 0 ? w : anchoActual + doc.getTextWidth(" ") + w;
+        if(candidato > anchoLinea && actual.length > 0){
+          lineas.push(actual);
+          actual = [palabra];
+          anchoActual = w;
+        } else {
+          actual.push(palabra);
+          anchoActual = candidato;
+        }
+      });
+      if(actual.length) lineas.push(actual);
+      return lineas;
+    }
+
+    doc.setFont("courier", "normal");
     if(titulo) {
       doc.setFontSize(13);
       doc.setFont("courier","bold");
@@ -398,27 +459,58 @@ II.- Que atento el estado de autos, solicito se abra el periodo a prueba.`;
       y += 1;
       checkPageBreak();
     }
-    
-    doc.setFont("courier","bold");
+
+    doc.setFont("courier","normal");
     doc.setFontSize(13);
     doc.text("SR. JUEZ:", x, y);
-    doc.setFont("courier","normal");
     y += 1;
     checkPageBreak();
-    
+
     let sangriaDoble = sangria * 2;
-    
-    let intro = `${ab.nombre}, Abogado, M.P. Nro. ${ab.matricula}, apoderado de ${parte}, manteniendo domicilio procesal en ${ab.domicilio_procesal} y domicilio electrónico ${ab.matricula}, en autos caratulados: "${casoSeleccionado.caratula}" (Expte. Nro. ${casoSeleccionado.num}), a V.S. digo:`;
-    let lineasIntro = doc.splitTextToSize(intro, maxWidth - sangriaDoble);
+
+    let parteNombre = ab.nombre;
+    let parteMedia = `, Abogado, M.P. Nro. ${ab.matricula}, apoderado de ${parte}, manteniendo domicilio procesal en ${ab.domicilio_procesal} y domicilio electrónico ${ab.matricula}, en autos caratulados: "`;
+    let parteCaratula = casoSeleccionado.caratula;
+    let parteFinal = `" (Expte. Nro. ${casoSeleccionado.num}), a V.S. digo:`;
+    let introPlano = parteNombre + parteMedia + parteCaratula + parteFinal;
+
+    let rangoNombreFin = parteNombre.length;
+    let rangoCaratulaIni = parteNombre.length + parteMedia.length;
+    let rangoCaratulaFin = rangoCaratulaIni + parteCaratula.length;
+    function esNegrita(offset){
+      return (offset < rangoNombreFin) ||
+             (offset >= rangoCaratulaIni && offset < rangoCaratulaFin);
+    }
+
+    let palabrasIntro = [];
+    let cursorOffset = 0;
+    introPlano.split(" ").forEach(token => {
+      if(token !== ""){
+        let piezas = [];
+        let actual = "";
+        let boldActual = null;
+        for(let i = 0; i < token.length; i++){
+          let b = esNegrita(cursorOffset + i);
+          if(boldActual === null){ actual = token[i]; boldActual = b; }
+          else if(b === boldActual){ actual += token[i]; }
+          else { piezas.push({ texto: actual, bold: boldActual }); actual = token[i]; boldActual = b; }
+        }
+        if(actual) piezas.push({ texto: actual, bold: boldActual });
+        palabrasIntro.push(piezas);
+      }
+      cursorOffset += token.length + 1;
+    });
+    let lineasIntro = armarLineasMixtas(palabrasIntro, maxWidth - sangriaDoble);
     lineasIntro.forEach((linea, i) => {
       let startX = i === 0 ? x + sangriaDoble : x;
       let ancho = i === 0 ? maxWidth - sangriaDoble : maxWidth;
-      escribirJustificado(linea, startX, ancho, i === lineasIntro.length - 1);
+      escribirJustificadoMixto(linea, startX, ancho, i === lineasIntro.length - 1);
     });
-    
+    doc.setFont("courier", "normal");
+
     y += 0.5;
     checkPageBreak();
-    
+
     cuerpo.split("\n").forEach(p => {
       let lineas = doc.splitTextToSize(p, maxWidth - sangriaDoble);
       lineas.forEach((linea, i) => {
@@ -429,11 +521,11 @@ II.- Que atento el estado de autos, solicito se abra el periodo a prueba.`;
       y += 0.3;
       checkPageBreak();
     });
-    
+
     checkPageBreak();
     doc.setFont("courier","bold");
     doc.text("SERÁ JUSTICIA", x + sangriaDoble, y);
-    y += 2;
+    y += 1.8;
     checkPageBreak();
     doc.setFont("courier","bold");
     doc.setFontSize(8);
@@ -441,7 +533,7 @@ II.- Que atento el estado de autos, solicito se abra el periodo a prueba.`;
     doc.setFont("courier","normal");
     y += 0.4;
     doc.text(`M.P. N°${ab.matricula}`, 10.5, y, {align:"center"});
-    
+
     doc.save("escrito.pdf");
   };
 })();
